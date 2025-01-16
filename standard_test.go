@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/etclabscore/go-openrpc-reflect/internal/fakearithmetic"
+	"github.com/ajhodges/go-openrpc-reflect/internal/fakearithmetic"
 	meta_schema "github.com/open-rpc/meta-schema"
 	"github.com/stretchr/testify/assert"
 )
@@ -37,7 +37,7 @@ func newStandardMethodTester() *MethodTester {
 		deprecated: []string{"Div"},
 		descriptionMatches: map[string]string{
 			".{1}": "(?m)^.*[a-z]+.*$", // Non empty.
-			".{2}": `func\s+\(.*\).*`,    // Contains func declaration.
+			".{2}": `func\s+\(.*\).*`,  // Contains func declaration.
 		},
 		summaryMatches: map[string]string{
 			"HasBatteries": `if the calculator has batteries`,
@@ -317,7 +317,6 @@ func TestStandardReflectorT_GetMethodParams(t *testing.T) {
 
 		b, _ := json.MarshalIndent(gotParams[0], "", "  ")
 		t.Log(string(b))
-
 
 		for _, wantTest := range c.params {
 			testJSON(t, b, wantTest)

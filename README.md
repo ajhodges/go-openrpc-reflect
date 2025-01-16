@@ -124,7 +124,7 @@ import (
 	"net/http"
 	"net/rpc"
 
-	go_openrpc_reflect "github.com/etclabscore/go-openrpc-reflect"
+	go_openrpc_reflect "github.com/ajhodges/go-openrpc-reflect"
 	meta_schema "github.com/open-rpc/meta-schema"
 )
 
@@ -348,7 +348,7 @@ Running this Example test yields the following response:
             },
             "externalDocs": {
                 "description": "Github remote link",
-                "url": "https://github.com/etclabscore/go-openrpc-reflect/blob/master/example1_test.go#L36"
+                "url": "https://github.com/ajhodges/go-openrpc-reflect/blob/master/example1_test.go#L36"
             }
         }
     ]

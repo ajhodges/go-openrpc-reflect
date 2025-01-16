@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"net/rpc"
 
-	go_openrpc_reflect "github.com/etclabscore/go-openrpc-reflect"
-	"github.com/etclabscore/go-openrpc-reflect/internal/fakearithmetic"
+	go_openrpc_reflect "github.com/ajhodges/go-openrpc-reflect"
+	"github.com/ajhodges/go-openrpc-reflect/internal/fakearithmetic"
 	meta_schema "github.com/open-rpc/meta-schema"
 )
 

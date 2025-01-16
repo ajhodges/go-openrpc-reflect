@@ -4,7 +4,7 @@ import (
 	"net"
 	"time"
 
-	go_openrpc_reflect "github.com/etclabscore/go-openrpc-reflect"
+	go_openrpc_reflect "github.com/ajhodges/go-openrpc-reflect"
 	meta_schema "github.com/open-rpc/meta-schema"
 )
 
@@ -31,7 +31,7 @@ func (d *RPCEthereum) Discover() (*meta_schema.OpenrpcDocument, error) {
 	return d.Doc.Discover()
 }
 
-//var ExampleMetaReflector = &MetaRegistererTester{}
+// var ExampleMetaReflector = &MetaRegistererTester{}
 var ExampleMetaReflector = &go_openrpc_reflect.MetaT{
 	GetServersFn:      getServers,
 	GetInfoFn:         getInfo,
@@ -51,11 +51,11 @@ func getInfo() (info *meta_schema.InfoObject) {
 	}
 }
 
-func getExternalDocs() (*meta_schema.ExternalDocumentationObject) {
+func getExternalDocs() *meta_schema.ExternalDocumentationObject {
 	return nil
 }
 
-func getServers() func (listeners []net.Listener) (*meta_schema.Servers, error) {
+func getServers() func(listeners []net.Listener) (*meta_schema.Servers, error) {
 	return go_openrpc_reflect.StandardReflector.GetServers()
 }
 

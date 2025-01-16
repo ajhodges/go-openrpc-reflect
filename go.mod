@@ -1,4 +1,4 @@
-module github.com/etclabscore/go-openrpc-reflect
+module github.com/ajhodges/go-openrpc-reflect
 
 go 1.21
 

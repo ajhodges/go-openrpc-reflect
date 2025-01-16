@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"net/rpc"
 
-	go_openrpc_reflect "github.com/etclabscore/go-openrpc-reflect"
+	go_openrpc_reflect "github.com/ajhodges/go-openrpc-reflect"
 	meta_schema "github.com/open-rpc/meta-schema"
 )
 

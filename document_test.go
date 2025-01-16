@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/etclabscore/go-openrpc-reflect/internal/fakearithmetic"
+	"github.com/ajhodges/go-openrpc-reflect/internal/fakearithmetic"
 	meta_schema "github.com/open-rpc/meta-schema"
 	"github.com/stretchr/testify/assert"
 )
 
-//var TestMetaRegisterer = &MetaRegistererTester{}
+// var TestMetaRegisterer = &MetaRegistererTester{}
 var TestMetaRegisterer = &MetaT{
 	GetServersFn:      getServers,
 	GetInfoFn:         getInfo,
@@ -32,11 +32,11 @@ func getInfo() (info *meta_schema.InfoObject) {
 	}
 }
 
-func getExternalDocs() (*meta_schema.ExternalDocumentationObject) {
+func getExternalDocs() *meta_schema.ExternalDocumentationObject {
 	return nil
 }
 
-func getServers() func (listeners []net.Listener) (*meta_schema.Servers, error) {
+func getServers() func(listeners []net.Listener) (*meta_schema.Servers, error) {
 	return StandardReflector.GetServers()
 }
 

@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/etclabscore/go-openrpc-reflect/internal/fakearithmetic"
+	"github.com/ajhodges/go-openrpc-reflect/internal/fakearithmetic"
 	meta_schema "github.com/open-rpc/meta-schema"
 	"github.com/stretchr/testify/assert"
 )
@@ -136,7 +136,7 @@ func TestEthereumReflectorT_ReceiverMethods(t *testing.T) {
 		`methods.#(name=="calculator_history").result.description`:                           "[]HistoryItem",
 		`methods.#(name=="calculator_history").result.schema.type`:                           "array",
 		`methods.#(name=="calculator_history").result.schema.items.0.type`:                   "object",
-		`methods.#(name=="calculator_history").result.schema.items.0.properties.Args.type`:   "array", 
+		`methods.#(name=="calculator_history").result.schema.items.0.properties.Args.type`:   "array",
 		`methods.#(name=="calculator_history").result.schema.items.0.properties.Method.type`: "string",
 
 		`methods.#(name=="calculator_last").params.#`:                             float64(0),

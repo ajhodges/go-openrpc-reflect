@@ -6,7 +6,7 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/etclabscore/go-openrpc-reflect/internal/fakegeometry"
+	"github.com/ajhodges/go-openrpc-reflect/internal/fakegeometry"
 )
 
 var CalculatorPublicMethodNames = []string{
@@ -67,7 +67,7 @@ func (c *Calculator) storeLatest(operationName string, args ...interface{}) {
 
 // Following methods implement various signatures and return values.
 
-//HasBatteries checks whether the calculator has batteries.
+// HasBatteries checks whether the calculator has batteries.
 func (c *Calculator) HasBatteries() bool {
 	c.storeLatest("HasBatteries")
 	return true
