@@ -92,7 +92,7 @@ func TestEthereumReflectorT_ReceiverMethods(t *testing.T) {
 	}
 
 	type T struct {
-		Methods []meta_schema.MethodObject `json:"methods"`
+		Methods []meta_schema.MethodOrReference `json:"methods"`
 	}
 	b, err := json.MarshalIndent(T{methods}, "", "  ")
 	assert.NoError(t, err)

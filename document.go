@@ -8,15 +8,14 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/alecthomas/jsonschema"
 	"github.com/go-openapi/spec"
+	"github.com/invopop/jsonschema"
 	meta_schema "github.com/open-rpc/meta-schema"
 )
 
 // MetaRegisterer implements methods that must come from the mind of the developer.
 // They describe the document (well, provide document description values) that cannot be
 // parsed from anything available.
-//
 type MetaRegisterer interface {
 	ServerRegisterer
 	GetInfo() func() (info *meta_schema.InfoObject)
@@ -31,7 +30,7 @@ type ServerRegisterer interface {
 
 type ReceiverRegisterer interface {
 	MethodRegisterer
-	ReceiverMethods(name string, receiver interface{}) ([]meta_schema.MethodObject, error)
+	ReceiverMethods(name string, receiver interface{}) ([]meta_schema.MethodOrReference, error)
 }
 
 type MethodRegisterer interface {
@@ -82,7 +81,7 @@ type SchemaRegisterer interface {
 	// SchemaIgnoredTypes reply will be passed directly to the jsonschema.Reflector.IgnoredTypes field.
 	SchemaIgnoredTypes() []interface{}
 	// SchemaTypeMap will be passed directory to the jsonschema.Reflector.TypeMapper field.
-	SchemaTypeMap() func(ty reflect.Type) *jsonschema.Type
+	SchemaTypeMap() func(ty reflect.Type) *jsonschema.Schema
 	// SchemaMutations will be run in a depth-first walk on the reflected schema.
 	// They will be run in order.
 	// Function wrapping allows closure fn to have context of root schema.
@@ -90,13 +89,12 @@ type SchemaRegisterer interface {
 	SchemaExamples(ty reflect.Type) (examples *meta_schema.Examples, err error)
 }
 
-//type Service int
+// type Service int
 
-//const (
+// const (
 //	Standard Service = iota
 //	Ethereum
-//)
-
+// )
 
 type Document struct {
 	meta          MetaRegisterer
@@ -106,7 +104,7 @@ type Document struct {
 	listeners     []net.Listener
 }
 
-//func (d *Document) RPCDiscover(kind Service) (receiver interface{}) {
+// func (d *Document) RPCDiscover(kind Service) (receiver interface{}) {
 //	switch kind {
 //	case Standard:
 //		return &RPC{d}
@@ -114,7 +112,7 @@ type Document struct {
 //		return &RPCEthereum{d}
 //	}
 //	return nil
-//}
+// }
 
 func (d *Document) RegisterReceiver(receiver interface{}) {
 	d.RegisterReceiverName("", receiver)
@@ -182,7 +180,7 @@ func (d *Document) Discover() (*meta_schema.OpenrpcDocument, error) {
 
 	// Iterate all registered receivers (aka 'modules'),
 	// building and collecting eligible methods for each.
-	methods := []meta_schema.MethodObject{}
+	methods := meta_schema.Methods{}
 	for i, rec := range d.receivers {
 		name := d.receiverNames[i]
 		ms, err := d.reflector.ReceiverMethods(name, rec)
@@ -193,12 +191,11 @@ func (d *Document) Discover() (*meta_schema.OpenrpcDocument, error) {
 	}
 
 	sort.Slice(methods, func(i, j int) bool {
-		return *methods[i].Name < *methods[j].Name
+		return *methods[i].MethodObject.Name < *methods[j].MethodObject.Name
 	})
 
-	// Assign by slice address.
-	m := meta_schema.Methods(methods)
-	out.Methods = &m
+	// Create Methods type and assign
+	out.Methods = &methods
 
 	return out, nil
 }

@@ -15,7 +15,7 @@ type EthereumReflectorT struct {
 
 var EthereumReflector = &EthereumReflectorT{}
 
-func (e *EthereumReflectorT) ReceiverMethods(name string, receiver interface{}) ([]meta_schema.MethodObject, error) {
+func (e *EthereumReflectorT) ReceiverMethods(name string, receiver interface{}) ([]meta_schema.MethodOrReference, error) {
 	if e.FnReceiverMethods != nil {
 		return e.FnReceiverMethods(name, receiver)
 	}

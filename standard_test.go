@@ -10,6 +10,7 @@ import (
 	"github.com/ajhodges/go-openrpc-reflect/internal/fakearithmetic"
 	meta_schema "github.com/open-rpc/meta-schema"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStandardReflectorT_GetServers(t *testing.T) {
@@ -61,7 +62,7 @@ func TestStandardReflectorT_ReceiverMethods(t *testing.T) {
 	}
 
 	type T struct {
-		Methods []meta_schema.MethodObject `json:"methods"`
+		Methods []meta_schema.MethodOrReference `json:"methods"`
 	}
 	b, err := json.MarshalIndent(T{methods}, "", "  ")
 	assert.NoError(t, err)
@@ -250,12 +251,12 @@ func TestStandardReflectorT_GetSchema(t *testing.T) {
 		}
 
 		schema, err := c.reflector.GetSchema(calcV, method, fields[c.fieldIndex], ty)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		for k, v := range c.want {
 			switch {
 			case k == "type":
-				assert.Equal(t, v, (*schema.JSONSchemaObject.Type.SimpleTypes))
+				assert.Equal(t, v, string(*schema.JSONSchemaObject.Type.SimpleTypes))
 			}
 		}
 	}
@@ -311,7 +312,7 @@ func TestStandardReflectorT_GetMethodParams(t *testing.T) {
 		fdecl := testMustGetASTFuncDecl(t, calcV, method)
 
 		gotParams, err := reflector.GetMethodParams(calcV, method, fdecl)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Len(t, gotParams, len(c.params))
 		assert.Len(t, gotParams, 1)
 

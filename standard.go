@@ -11,8 +11,8 @@ import (
 	"regexp"
 	"runtime"
 
-	"github.com/alecthomas/jsonschema"
 	"github.com/go-openapi/spec"
+	"github.com/invopop/jsonschema"
 	meta_schema "github.com/open-rpc/meta-schema"
 )
 
@@ -20,41 +20,41 @@ import (
 // StandardReflectorT embeds this struct, together with self.FnMethod != nil checks, as a way to easily override
 // defaults from the consuming application side. See example4_test.go for an an example.
 type ReceiverReflectorT struct {
-	FnReceiverMethods func (name string, receiver interface{}) ([]meta_schema.MethodObject, error)
-	FnIsMethodEligible func(method reflect.Method) bool
-	FnGetMethodName func(moduleName string, r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) (string, error)
-	FnGetMethodTags func(r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) (*meta_schema.MethodObjectTags, error)
-	FnGetMethodDescription func(r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) (string, error)
-	FnGetMethodSummary func(r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) (string, error)
-	FnGetMethodDeprecated func(r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) (bool, error)
-	FnGetMethodParamStructure func(r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) (string, error)
-	FnGetMethodErrors func(r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) (*meta_schema.MethodObjectErrors, error)
-	FnGetMethodExternalDocs func(r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) (*meta_schema.ExternalDocumentationObject, error)
-	FnGetMethodServers func(r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) (*meta_schema.Servers, error)
-	FnGetMethodLinks func(r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) (*meta_schema.MethodObjectLinks, error)
-	FnGetMethodExamples func(r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) (*meta_schema.MethodObjectExamples, error)
-	FnGetMethodParams func(r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) ([]meta_schema.ContentDescriptorObject, error)
-	FnGetMethodResult func(r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) (meta_schema.ContentDescriptorObject, error)
-	FnGetContentDescriptorName func(r reflect.Value, m reflect.Method, field *ast.Field) (string, error)
-	FnGetContentDescriptorSummary func(r reflect.Value, m reflect.Method, field *ast.Field) (string, error)
+	FnReceiverMethods                 func(name string, receiver interface{}) ([]meta_schema.MethodOrReference, error)
+	FnIsMethodEligible                func(method reflect.Method) bool
+	FnGetMethodName                   func(moduleName string, r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) (string, error)
+	FnGetMethodTags                   func(r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) (*meta_schema.MethodObjectTags, error)
+	FnGetMethodDescription            func(r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) (string, error)
+	FnGetMethodSummary                func(r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) (string, error)
+	FnGetMethodDeprecated             func(r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) (bool, error)
+	FnGetMethodParamStructure         func(r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) (string, error)
+	FnGetMethodErrors                 func(r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) (*meta_schema.MethodObjectErrors, error)
+	FnGetMethodExternalDocs           func(r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) (*meta_schema.ExternalDocumentationObject, error)
+	FnGetMethodServers                func(r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) (*meta_schema.Servers, error)
+	FnGetMethodLinks                  func(r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) (*meta_schema.MethodObjectLinks, error)
+	FnGetMethodExamples               func(r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) (*meta_schema.MethodObjectExamples, error)
+	FnGetMethodParams                 func(r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) ([]meta_schema.ContentDescriptorObject, error)
+	FnGetMethodResult                 func(r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) (meta_schema.ContentDescriptorObject, error)
+	FnGetContentDescriptorName        func(r reflect.Value, m reflect.Method, field *ast.Field) (string, error)
+	FnGetContentDescriptorSummary     func(r reflect.Value, m reflect.Method, field *ast.Field) (string, error)
 	FnGetContentDescriptorDescription func(r reflect.Value, m reflect.Method, field *ast.Field) (string, error)
-	FnGetContentDescriptorRequired func(r reflect.Value, m reflect.Method, field *ast.Field) (bool, error)
-	FnGetContentDescriptorDeprecated func(r reflect.Value, m reflect.Method, field *ast.Field) (bool, error)
-	FnGetSchema func(r reflect.Value, m reflect.Method, field *ast.Field, ty reflect.Type) (schema meta_schema.JSONSchema, err error)
-	FnSchemaIgnoredTypes func () []interface{}
-	FnSchemaTypeMap func () func(ty reflect.Type) *jsonschema.Type
-	FnSchemaMutations func (ty reflect.Type) []func (*spec.Schema) func(*spec.Schema) error
-	FnSchemaExamples func (ty reflect.Type) (examples *meta_schema.Examples, err error)
+	FnGetContentDescriptorRequired    func(r reflect.Value, m reflect.Method, field *ast.Field) (bool, error)
+	FnGetContentDescriptorDeprecated  func(r reflect.Value, m reflect.Method, field *ast.Field) (bool, error)
+	FnGetSchema                       func(r reflect.Value, m reflect.Method, field *ast.Field, ty reflect.Type) (schema meta_schema.JSONSchema, err error)
+	FnSchemaIgnoredTypes              func() []interface{}
+	FnSchemaTypeMap                   func() func(ty reflect.Type) *jsonschema.Schema
+	FnSchemaMutations                 func(ty reflect.Type) []func(*spec.Schema) func(*spec.Schema) error
+	FnSchemaExamples                  func(ty reflect.Type) (examples *meta_schema.Examples, err error)
 }
 
-type StandardReflectorT struct{
+type StandardReflectorT struct {
 	ReceiverReflectorT
 }
 
 var StandardReflector = &StandardReflectorT{}
 
-func (c *StandardReflectorT) GetServers() func (listeners []net.Listener) (*meta_schema.Servers, error) {
-	return func (listeners []net.Listener) (*meta_schema.Servers, error) {
+func (c *StandardReflectorT) GetServers() func(listeners []net.Listener) (*meta_schema.Servers, error) {
+	return func(listeners []net.Listener) (*meta_schema.Servers, error) {
 		if listeners == nil {
 			return nil, nil
 		}
@@ -77,7 +77,7 @@ func (c *StandardReflectorT) GetServers() func (listeners []net.Listener) (*meta
 	}
 }
 
-func (c *StandardReflectorT) ReceiverMethods(name string, receiver interface{}) ([]meta_schema.MethodObject, error) {
+func (c *StandardReflectorT) ReceiverMethods(name string, receiver interface{}) ([]meta_schema.MethodOrReference, error) {
 	if c.FnReceiverMethods != nil {
 		return c.FnReceiverMethods(name, receiver)
 	}
@@ -300,10 +300,10 @@ func (c *StandardReflectorT) GetContentDescriptorName(r reflect.Value, m reflect
 	fs := expandedFieldNamesFromList([]*ast.Field{field})
 	name := fs[0].Names[0].Name
 
-	//// Remove '*' signifying pointers in Go.
-	//if strings.HasPrefix(name, "*") {
+	// // Remove '*' signifying pointers in Go.
+	// if strings.HasPrefix(name, "*") {
 	//	name = strings.TrimPrefix(name, "*")
-	//}
+	// }
 	return name, nil
 }
 
@@ -367,7 +367,7 @@ func (c *StandardReflectorT) SchemaIgnoredTypes() []interface{} {
 	return nil
 }
 
-func (c *StandardReflectorT) SchemaTypeMap() func(ty reflect.Type) *jsonschema.Type {
+func (c *StandardReflectorT) SchemaTypeMap() func(ty reflect.Type) *jsonschema.Schema {
 	if c.FnSchemaTypeMap != nil {
 		return c.FnSchemaTypeMap()
 	}
@@ -394,7 +394,7 @@ func (c *StandardReflectorT) SchemaExamples(ty reflect.Type) (examples *meta_sch
 
 // ------------------------------------------------------------------------------
 
-func SchemaMutationRemoveDefinitionsField(root *spec.Schema) func (s *spec.Schema) error {
+func SchemaMutationRemoveDefinitionsField(root *spec.Schema) func(s *spec.Schema) error {
 	return func(s *spec.Schema) error {
 		s.Definitions = nil
 		s.Ref = spec.Ref{}
@@ -402,13 +402,13 @@ func SchemaMutationRemoveDefinitionsField(root *spec.Schema) func (s *spec.Schem
 	}
 }
 
-func SchemaMutationExpand(root *spec.Schema) func (s *spec.Schema) error {
+func SchemaMutationExpand(root *spec.Schema) func(s *spec.Schema) error {
 	return func(s *spec.Schema) error {
 		return spec.ExpandSchema(s, root, nil)
 	}
 }
 
-func SchemaMutationRequireDefaultOn(root *spec.Schema) func (s *spec.Schema) error {
+func SchemaMutationRequireDefaultOn(root *spec.Schema) func(s *spec.Schema) error {
 	return func(s *spec.Schema) error {
 		// If we didn't explicitly set any fields as required with jsonschema tags,
 		// then we can assume the default, that ALL properties are required.

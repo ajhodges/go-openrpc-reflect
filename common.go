@@ -16,9 +16,9 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/alecthomas/jsonschema"
 	go_jsonschema_walk "github.com/etclabscore/go-jsonschema-walk"
 	"github.com/go-openapi/spec"
+	"github.com/invopop/jsonschema"
 	meta_schema "github.com/open-rpc/meta-schema"
 )
 
@@ -32,29 +32,27 @@ var nullSchema meta_schema.JSONSchema
 func init() {
 	nullS := "Null"
 
-	var nullT interface{}
-	nullT = "null"
+	var nullT meta_schema.SimpleTypes = "null"
 
 	required, deprecated := true, false
 
 	nullSchema = meta_schema.JSONSchema{
 		JSONSchemaObject: &meta_schema.JSONSchemaObject{
 			Type: &meta_schema.Type{
-				SimpleTypes: (*meta_schema.SimpleTypes)(&nullT),
+				SimpleTypes: &nullT,
 			},
 		}}
 
 	nullContentDescriptor = meta_schema.ContentDescriptorObject{
 		Name:        (*meta_schema.ContentDescriptorObjectName)(&nullS),
 		Description: (*meta_schema.ContentDescriptorObjectDescription)(&nullS),
-		// Summary:     (*meta_schema.ContentDescriptorObjectSummary)(&nullS),
-		Schema:     &nullSchema,
-		Required:   (*meta_schema.ContentDescriptorObjectRequired)(&required),
-		Deprecated: (*meta_schema.ContentDescriptorObjectDeprecated)(&deprecated),
+		Schema:      &nullSchema,
+		Required:    (*meta_schema.ContentDescriptorObjectRequired)(&required),
+		Deprecated:  (*meta_schema.ContentDescriptorObjectDeprecated)(&deprecated),
 	}
 }
 
-func receiverMethods(methodHandler MethodRegisterer, name string, receiver interface{}) (object []meta_schema.MethodObject, err error) {
+func receiverMethods(methodHandler MethodRegisterer, name string, receiver interface{}) (object []meta_schema.MethodOrReference, err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("receiverMethods error: %w", err)
@@ -64,7 +62,7 @@ func receiverMethods(methodHandler MethodRegisterer, name string, receiver inter
 	ty := reflect.TypeOf(receiver)
 	rval := reflect.ValueOf(receiver)
 
-	methods := []meta_schema.MethodObject{}
+	methods := meta_schema.Methods{}
 	for m := 0; m < ty.NumMethod(); m++ {
 		method := ty.Method(m)
 		if !methodHandler.IsMethodEligible(method) {
@@ -167,7 +165,7 @@ func receiverMethods(methodHandler MethodRegisterer, name string, receiver inter
 			Deprecated:     (*meta_schema.MethodObjectDeprecated)(&deprecated),
 			ExternalDocs:   exDocs,
 		}
-		methods = append(methods, me)
+		methods = append(methods, meta_schema.MethodOrReference{MethodObject: &me})
 	}
 	return methods, nil
 }
@@ -265,7 +263,7 @@ func buildJSONSchemaObject(registerer SchemaRegisterer, r reflect.Value, m refle
 		RequiredFromJSONSchemaTags: true,
 		ExpandedStruct:             false,
 		IgnoredTypes:               registerer.SchemaIgnoredTypes(),
-		TypeMapper:                 registerer.SchemaTypeMap(),
+		Mapper:                     registerer.SchemaTypeMap(),
 	}
 
 	jsch := rflctr.ReflectFromType(ty)
