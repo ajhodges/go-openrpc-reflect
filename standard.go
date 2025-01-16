@@ -379,9 +379,12 @@ func (c *StandardReflectorT) SchemaMutations(ty reflect.Type) []func(*spec.Schem
 		return c.FnSchemaMutations(ty)
 	}
 	return []func(*spec.Schema) func(*spec.Schema) error{
-		SchemaMutationRequireDefaultOn,
-		SchemaMutationExpand,
+		// First remove definitions and refs to prevent expansion issues
 		SchemaMutationRemoveDefinitionsField,
+		// Then expand any remaining references
+		SchemaMutationExpand,
+		// Finally set required fields
+		SchemaMutationRequireDefaultOn,
 	}
 }
 
@@ -396,23 +399,57 @@ func (c *StandardReflectorT) SchemaExamples(ty reflect.Type) (examples *meta_sch
 
 func SchemaMutationRemoveDefinitionsField(root *spec.Schema) func(s *spec.Schema) error {
 	return func(s *spec.Schema) error {
+		// Skip if schema is nil
+		if s == nil {
+			return nil
+		}
+		// Clear definitions and refs
 		s.Definitions = nil
 		s.Ref = spec.Ref{}
+		// Also clear refs in properties
+		if s.Properties != nil {
+			for _, prop := range s.Properties {
+				prop.Ref = spec.Ref{}
+				prop.Definitions = nil
+			}
+		}
 		return nil
 	}
 }
 
 func SchemaMutationExpand(root *spec.Schema) func(s *spec.Schema) error {
 	return func(s *spec.Schema) error {
-		return spec.ExpandSchema(s, root, nil)
+		// Skip if schema is nil
+		if s == nil {
+			return nil
+		}
+		// Skip if no references to expand
+		if s.Ref.String() == "" && len(s.Definitions) == 0 {
+			return nil
+		}
+		// Create a copy of root for expansion
+		rootCopy := &spec.Schema{}
+		*rootCopy = *root
+		// Clear any refs in root copy to prevent circular references
+		rootCopy.Ref = spec.Ref{}
+		if err := spec.ExpandSchema(s, rootCopy, nil); err != nil {
+			// If expansion fails, just clear the reference
+			s.Ref = spec.Ref{}
+			s.Definitions = nil
+			return nil
+		}
+		return nil
 	}
 }
 
 func SchemaMutationRequireDefaultOn(root *spec.Schema) func(s *spec.Schema) error {
 	return func(s *spec.Schema) error {
-		// If we didn't explicitly set any fields as required with jsonschema tags,
-		// then we can assume the default, that ALL properties are required.
-		if len(s.Required) == 0 {
+		// Skip if schema is nil
+		if s == nil {
+			return nil
+		}
+		// Only set required fields if we have properties
+		if s.Properties != nil && len(s.Required) == 0 {
 			for k := range s.Properties {
 				s.Required = append(s.Required, k)
 			}

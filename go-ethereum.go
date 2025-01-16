@@ -113,23 +113,61 @@ func (e *EthereumReflectorT) GetMethodParams(r reflect.Value, m reflect.Method, 
 	return out, nil
 }
 
-func (e *EthereumReflectorT) GetMethodResult(r reflect.Value, m reflect.Method, astFunc *ast.FuncDecl) (meta_schema.ContentDescriptorObject, error) {
+func (e *EthereumReflectorT) GetMethodResult(r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) (meta_schema.ContentDescriptorObject, error) {
 	if e.FnGetMethodResult != nil {
-		return e.FnGetMethodResult(r, m, astFunc)
+		return e.FnGetMethodResult(r, m, funcDecl)
 	}
-	if astFunc.Type.Results == nil {
+	if funcDecl.Type.Results == nil {
 		return nullContentDescriptor, nil
 	}
 
-	expandedFields := expandedFieldNamesFromList(astFunc.Type.Results.List)
-
-	if len(expandedFields) == 0 {
+	// Check if method returns only error
+	if m.Type.NumOut() == 1 && m.Type.Out(0) == errType {
 		return nullContentDescriptor, nil
 	}
 
-	if m.Type.NumOut() == 0 || m.Type.Out(0) == errType {
+	// Get the first non-error return type
+	var resultType reflect.Type
+	var resultField *ast.Field
+
+	// Find first non-error return type
+	for i := 0; i < m.Type.NumOut(); i++ {
+		if m.Type.Out(i) != errType {
+			resultType = m.Type.Out(i)
+			if i < len(funcDecl.Type.Results.List) {
+				resultField = funcDecl.Type.Results.List[i]
+			}
+			break
+		}
+	}
+
+	// If no non-error return type found, return null descriptor
+	if resultType == nil {
 		return nullContentDescriptor, nil
 	}
 
-	return buildContentDescriptorObject(e, r, m, expandedFields[0], m.Type.Out(0))
+	// Handle special case for nil field
+	if resultField == nil {
+		name := resultType.String()
+		description := name
+		summary := ""
+		required := true
+		deprecated := false
+
+		schema, err := e.GetSchema(r, m, nil, resultType)
+		if err != nil {
+			return nullContentDescriptor, err
+		}
+
+		return meta_schema.ContentDescriptorObject{
+			Name:        (*meta_schema.ContentDescriptorObjectName)(&name),
+			Description: (*meta_schema.ContentDescriptorObjectDescription)(&description),
+			Summary:     (*meta_schema.ContentDescriptorObjectSummary)(&summary),
+			Schema:      &schema,
+			Required:    (*meta_schema.ContentDescriptorObjectRequired)(&required),
+			Deprecated:  (*meta_schema.ContentDescriptorObjectDeprecated)(&deprecated),
+		}, nil
+	}
+
+	return buildContentDescriptorObject(e, r, m, resultField, resultType)
 }

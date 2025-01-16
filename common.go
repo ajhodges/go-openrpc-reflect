@@ -253,75 +253,262 @@ func buildContentDescriptorObject(registerer ContentDescriptorRegisterer, r refl
 }
 
 func buildJSONSchemaObject(registerer SchemaRegisterer, r reflect.Value, m reflect.Method, field *ast.Field, ty reflect.Type) (schema meta_schema.JSONSchema, err error) {
-	if !jsonschemaPkgSupport(ty) {
-		err = json.Unmarshal([]byte(`{"type": "object", "title": "typeUnsupportedByJSONSchema"}`), &schema)
+	// Initialize schema with empty object
+	schema.JSONSchemaObject = &meta_schema.JSONSchemaObject{}
+
+	if ty == nil {
+		// Return a null type schema for nil types
+		nullType := meta_schema.SimpleTypes("null")
+		schema.JSONSchemaObject.Type = &meta_schema.Type{
+			SimpleTypes: &nullType,
+		}
 		return
 	}
 
-	rflctr := jsonschema.Reflector{
+	// Handle pointer types first
+	originalType := ty
+	for ty.Kind() == reflect.Ptr {
+		// Handle special cases
+		if ty.Elem().Name() == "Int" && ty.Elem().PkgPath() == "math/big" {
+			schema.JSONSchemaObject.Type = &meta_schema.Type{
+				SimpleTypes: (*meta_schema.SimpleTypes)(stringPtr("object")),
+			}
+			// Set additionalProperties to false for big.Int
+			falseVal := meta_schema.JSONSchemaBoolean(false)
+			schema.JSONSchemaObject.AdditionalProperties = &meta_schema.JSONSchema{JSONSchemaBoolean: &falseVal}
+			return
+		}
+		// Handle nil pointer
+		if ty.Elem() == nil {
+			schema.JSONSchemaObject.Type = &meta_schema.Type{
+				SimpleTypes: (*meta_schema.SimpleTypes)(stringPtr("null")),
+			}
+			return
+		}
+		ty = ty.Elem()
+	}
+
+	// Handle special types that might cause reflection issues
+	switch {
+	case ty.Kind() == reflect.Interface:
+		fallthrough
+	case ty.Kind() == reflect.Ptr && ty.Elem().Kind() == reflect.Interface:
+		fallthrough
+	case !jsonschemaPkgSupport(ty):
+		schema.JSONSchemaObject.Type = &meta_schema.Type{
+			SimpleTypes: (*meta_schema.SimpleTypes)(stringPtr("object")),
+		}
+		// Set additionalProperties to false for object types
+		falseVal := meta_schema.JSONSchemaBoolean(false)
+		schema.JSONSchemaObject.AdditionalProperties = &meta_schema.JSONSchema{JSONSchemaBoolean: &falseVal}
+		return
+	}
+
+	// Handle basic types directly
+	switch ty.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		schema.JSONSchemaObject.Type = &meta_schema.Type{
+			SimpleTypes: (*meta_schema.SimpleTypes)(stringPtr("integer")),
+		}
+		return
+	case reflect.Float32, reflect.Float64:
+		schema.JSONSchemaObject.Type = &meta_schema.Type{
+			SimpleTypes: (*meta_schema.SimpleTypes)(stringPtr("number")),
+		}
+		return
+	case reflect.Bool:
+		schema.JSONSchemaObject.Type = &meta_schema.Type{
+			SimpleTypes: (*meta_schema.SimpleTypes)(stringPtr("boolean")),
+		}
+		return
+	case reflect.String:
+		schema.JSONSchemaObject.Type = &meta_schema.Type{
+			SimpleTypes: (*meta_schema.SimpleTypes)(stringPtr("string")),
+		}
+		return
+	case reflect.Map:
+		schema.JSONSchemaObject.Type = &meta_schema.Type{
+			SimpleTypes: (*meta_schema.SimpleTypes)(stringPtr("object")),
+		}
+		// Set additionalProperties to false for maps
+		falseVal := meta_schema.JSONSchemaBoolean(false)
+		schema.JSONSchemaObject.AdditionalProperties = &meta_schema.JSONSchema{JSONSchemaBoolean: &falseVal}
+		return
+	case reflect.Slice, reflect.Array:
+		schema.JSONSchemaObject.Type = &meta_schema.Type{
+			SimpleTypes: (*meta_schema.SimpleTypes)(stringPtr("array")),
+		}
+		// Handle array item type
+		if ty.Elem() != nil {
+			itemSchema, err := buildJSONSchemaObject(registerer, r, m, field, ty.Elem())
+			if err == nil && itemSchema.JSONSchemaObject != nil {
+				// Create a reference to the item schema
+				schema.JSONSchemaObject.Items = &meta_schema.Items{
+					JSONSchema: &itemSchema,
+				}
+			}
+		}
+		return
+	case reflect.Struct:
+		schema.JSONSchemaObject.Type = &meta_schema.Type{
+			SimpleTypes: (*meta_schema.SimpleTypes)(stringPtr("object")),
+		}
+
+		// Initialize properties
+		properties := meta_schema.Properties{}
+		schema.JSONSchemaObject.Properties = &properties
+
+		// Set additionalProperties to false
+		falseVal := meta_schema.JSONSchemaBoolean(false)
+		schema.JSONSchemaObject.AdditionalProperties = &meta_schema.JSONSchema{JSONSchemaBoolean: &falseVal}
+
+		// Add properties for struct fields
+		for i := 0; i < ty.NumField(); i++ {
+			field := ty.Field(i)
+			if !field.IsExported() {
+				continue
+			}
+
+			// Get the JSON tag name if present, otherwise use field name
+			jsonName := field.Name
+			if tag := field.Tag.Get("json"); tag != "" {
+				if comma := strings.Index(tag, ","); comma != -1 {
+					jsonName = tag[:comma]
+				} else {
+					jsonName = tag
+				}
+			}
+
+			// Skip if json tag is "-"
+			if jsonName == "-" {
+				continue
+			}
+
+			fieldSchema, err := buildJSONSchemaObject(registerer, r, m, nil, field.Type)
+			if err != nil {
+				continue
+			}
+
+			// Handle required fields based on json tag
+			if strings.Contains(field.Tag.Get("json"), ",required") {
+				if schema.JSONSchemaObject.Required == nil {
+					schema.JSONSchemaObject.Required = &meta_schema.StringArray{}
+				}
+				*schema.JSONSchemaObject.Required = append(*schema.JSONSchemaObject.Required, meta_schema.StringDoaGddGA(jsonName))
+			}
+
+			(*schema.JSONSchemaObject.Properties)[jsonName] = fieldSchema
+		}
+		return
+	}
+
+	// Create reflector with custom type handling
+	rflctr := &jsonschema.Reflector{
 		AllowAdditionalProperties:  false,
 		RequiredFromJSONSchemaTags: true,
-		ExpandedStruct:             false,
+		ExpandedStruct:             true,
 		IgnoredTypes:               registerer.SchemaIgnoredTypes(),
 		Mapper:                     registerer.SchemaTypeMap(),
 	}
 
-	jsch := rflctr.ReflectFromType(ty)
+	// Use the original type for reflection if it's a named pointer type
+	reflectType := ty
+	if originalType.Kind() == reflect.Ptr && originalType.Elem().Name() != "" {
+		reflectType = originalType
+	}
 
-	// Poor man's glue.
-	// Need to get the type from the go struct -> json reflector package
-	// to the swagger/go-openapi/jsonschema spec.
-	// Do this with JSON marshaling.
-	// Hacky? Maybe. Effective? Maybe.
+	// Protect against nil or invalid types
+	if reflectType == nil || reflectType.Kind() == reflect.Invalid {
+		schema.JSONSchemaObject.Type = &meta_schema.Type{
+			SimpleTypes: (*meta_schema.SimpleTypes)(stringPtr("object")),
+		}
+		return
+	}
+
+	// Reflect the schema from the type
+	var jsch *jsonschema.Schema
+	defer func() {
+		if r := recover(); r != nil {
+			schema.JSONSchemaObject.Type = &meta_schema.Type{
+				SimpleTypes: (*meta_schema.SimpleTypes)(stringPtr("object")),
+			}
+			err = nil
+		}
+	}()
+	jsch = rflctr.ReflectFromType(reflectType)
+
+	if jsch == nil {
+		schema.JSONSchemaObject.Type = &meta_schema.Type{
+			SimpleTypes: (*meta_schema.SimpleTypes)(stringPtr("object")),
+		}
+		return
+	}
+
+	// Convert to JSON for transformation
 	mm, err := json.Marshal(jsch)
 	if err != nil {
-		return schema, err
+		return schema, fmt.Errorf("marshal schema error: %w", err)
 	}
 
+	// Unmarshal into our schema type
 	err = json.Unmarshal(mm, &schema)
 	if err != nil {
-		return schema, fmt.Errorf("unmarshal jsch error: %v\n\n%s", err, string(mm))
+		return schema, fmt.Errorf("unmarshal schema error: %v\n\nschema JSON: %s", err, string(mm))
 	}
 
-	if mutations := registerer.SchemaMutations(ty); len(mutations) > 0 {
-
-		jj := spec.Schema{}
-		err = json.Unmarshal(mm, &jj)
+	// Apply any schema mutations
+	if mutations := registerer.SchemaMutations(reflectType); len(mutations) > 0 {
+		// Create a new spec.Schema for mutations
+		jj := &spec.Schema{}
+		err = json.Unmarshal(mm, jj)
 		if err != nil {
-			return schema, err
+			return schema, fmt.Errorf("unmarshal to spec.Schema error: %w", err)
+		}
+
+		// Create a copy for definitions
+		root := &spec.Schema{}
+		if err := json.Unmarshal(mm, root); err != nil {
+			return schema, fmt.Errorf("unmarshal root schema error: %w", err)
 		}
 
 		a := go_jsonschema_walk.NewWalker()
 		for _, m := range mutations {
-			// Initialize the mutation the function.
-			// This way, the function is able to be aware of the mutation context,
-			// ie establish the root schema context.
-			mutFn := m(&jj)
-			if err := a.DepthFirst(&jj, mutFn); err != nil {
-				return schema, err
+			mutFn := m(root)
+			if err := a.DepthFirst(jj, mutFn); err != nil {
+				return schema, fmt.Errorf("schema mutation error: %w", err)
 			}
 		}
 
+		// Marshal the mutated schema
 		out, err := json.Marshal(jj)
 		if err != nil {
-			return schema, err
+			return schema, fmt.Errorf("marshal mutated schema error: %w", err)
 		}
 
-		schema = meta_schema.JSONSchema{} // Reinitialize
+		// Reinitialize and unmarshal the final schema
+		schema = meta_schema.JSONSchema{JSONSchemaObject: &meta_schema.JSONSchemaObject{}}
 		err = json.Unmarshal(out, &schema)
 		if err != nil {
-			fmt.Println(string(out))
-			return schema, fmt.Errorf("error: %v, schema: %s", err, string(out))
+			return schema, fmt.Errorf("unmarshal mutated schema error: %v\nschema JSON: %s", err, string(out))
 		}
 	}
 
-	examples, err := registerer.SchemaExamples(ty)
+	// Add examples if available
+	examples, err := registerer.SchemaExamples(reflectType)
 	if err != nil {
-		return schema, err
+		return schema, fmt.Errorf("get schema examples error: %w", err)
 	}
-	schema.JSONSchemaObject.Examples = examples // ok if nil
+	if schema.JSONSchemaObject != nil {
+		schema.JSONSchemaObject.Examples = examples
+	}
 
 	return schema, nil
+}
+
+// Helper function to create string pointers
+func stringPtr(s string) *string {
+	return &s
 }
 
 func isExportedMethod(method reflect.Method) bool {

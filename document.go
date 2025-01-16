@@ -154,7 +154,7 @@ func (d *Document) Discover() (*meta_schema.OpenrpcDocument, error) {
 		return nil, fmt.Errorf("meta: %v", errMissingInterface)
 	}
 
-	openRPCDocumentVersion := meta_schema.OpenrpcEnum0
+	openRPCDocumentVersion := meta_schema.OpenrpcEnum3
 	out := &meta_schema.OpenrpcDocument{
 		Openrpc:      &openRPCDocumentVersion,
 		Info:         d.meta.GetInfo()(),         // This will panic if the developer misuses it (leaves it nil).
