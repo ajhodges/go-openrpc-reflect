@@ -14,9 +14,15 @@ import (
 
 type EthereumReflectorT struct {
 	StandardReflectorT
+
+	pkgName string
 }
 
 var EthereumReflector = &EthereumReflectorT{}
+
+func EthereumReflectorWithPkg(pkgName string) *EthereumReflectorT {
+	return &EthereumReflectorT{pkgName: pkgName}
+}
 
 func (e *EthereumReflectorT) ReceiverMethods(name string, receiver interface{}) ([]meta_schema.MethodOrReference, error) {
 	if e.FnReceiverMethods != nil {
@@ -87,11 +93,17 @@ func (e *EthereumReflectorT) GetMethodName(moduleName string, r reflect.Value, m
 	return moduleName + "_" + firstToLower(m.Name), nil
 }
 
-func generateJSONSchema(ty reflect.Type) (*meta_schema.JSONSchema, error) {
+func generateJSONSchema(pkgName string, ty reflect.Type) (*meta_schema.JSONSchema, error) {
 	reflector := &jsonschema.Reflector{
 		Anonymous:      true,
 		DoNotReference: true,
 		AssignAnchor:   false,
+	}
+	if pkgName != "" {
+		err := reflector.AddGoComments(pkgName, "./")
+		if err != nil {
+			return nil, err
+		}
 	}
 	schema := reflector.Reflect(reflect.New(ty).Interface())
 
@@ -128,7 +140,7 @@ func (e *EthereumReflectorT) GetMethodParams(r reflect.Value, m reflect.Method, 
 			continue
 		}
 
-		schema, err := generateJSONSchema(ty)
+		schema, err := generateJSONSchema(e.pkgName, ty)
 		if err != nil {
 			return nil, err
 		}
@@ -181,7 +193,7 @@ func (e *EthereumReflectorT) GetMethodResult(r reflect.Value, m reflect.Method, 
 		return nullContentDescriptor, nil
 	}
 
-	schema, err := generateJSONSchema(resultType)
+	schema, err := generateJSONSchema(e.pkgName, resultType)
 	if err != nil {
 		return nullContentDescriptor, err
 	}
