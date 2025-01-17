@@ -288,3 +288,13 @@ func getFieldType(field *ast.Field) reflect.Type {
 
 	return nil
 }
+
+func (e *EthereumReflectorT) GetMethodDescription(r reflect.Value, m reflect.Method, astFunc *ast.FuncDecl) (string, error) {
+	// Get description from AST if available
+	if astFunc != nil {
+		if desc := getMethodDescription(m, astFunc); desc != "" {
+			return desc, nil
+		}
+	}
+	return m.Name, nil
+}

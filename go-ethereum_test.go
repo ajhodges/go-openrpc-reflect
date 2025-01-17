@@ -33,7 +33,6 @@ func newEthereumMethodTester() *MethodTester {
 		deprecated: []string{"Div"},
 		descriptionMatches: map[string]string{
 			".{1}": "(?m)^.*[a-z]+.*$", // Non empty.
-			".{2}": `func\s+\(.*\)`,    // Contains func declaration.
 		},
 		summaryMatches: map[string]string{
 			"HasBatteries":   `whether the calculator has`,
