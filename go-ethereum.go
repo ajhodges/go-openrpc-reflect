@@ -8,6 +8,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/invopop/jsonschema"
 	meta_schema "github.com/open-rpc/meta-schema"
 )
 
@@ -95,31 +96,53 @@ func (e *EthereumReflectorT) GetMethodParams(r reflect.Value, m reflect.Method, 
 	}
 
 	out := []meta_schema.ContentDescriptorObject{}
-
 	expanded := expandedFieldNamesFromList(astFunc.Type.Params.List)
+
+	reflector := &jsonschema.Reflector{DoNotReference: true}
 
 	for i, field := range expanded {
 		ty := m.Type.In(i + 1)
 
-		// go-ethereum/rpc skips the first parameter if it is context.Context,
-		// which is used for subscriptions.
+		// Skip context.Context parameter
 		if i+1 == 1 && ty == contextType {
 			continue
 		}
-		cd, err := buildContentDescriptorObject(e, r, m, field, ty)
+
+		// Generate JSON schema for the parameter type
+		schema := reflector.Reflect(reflect.New(ty).Interface())
+		marshalledJSON, err := schema.MarshalJSON()
 		if err != nil {
 			return nil, err
 		}
+		parsed := &meta_schema.JSONSchema{}
+		err = parsed.UnmarshalJSON(marshalledJSON)
+		if err != nil {
+			return nil, err
+		}
+
+		name := field.Names[0].Name
+		desc, err := e.GetContentDescriptorDescription(r, m, field)
+		if err != nil {
+			return nil, err
+		}
+
+		cd := meta_schema.ContentDescriptorObject{
+			Name:        (*meta_schema.ContentDescriptorObjectName)(&name),
+			Description: (*meta_schema.ContentDescriptorObjectDescription)(&desc),
+			Schema:      parsed,
+			Required:    (*meta_schema.ContentDescriptorObjectRequired)(new(bool)),
+		}
+		*cd.Required = true
 		out = append(out, cd)
 	}
 	return out, nil
 }
 
-func (e *EthereumReflectorT) GetMethodResult(r reflect.Value, m reflect.Method, funcDecl *ast.FuncDecl) (meta_schema.ContentDescriptorObject, error) {
+func (e *EthereumReflectorT) GetMethodResult(r reflect.Value, m reflect.Method, astFunc *ast.FuncDecl) (meta_schema.ContentDescriptorObject, error) {
 	if e.FnGetMethodResult != nil {
-		return e.FnGetMethodResult(r, m, funcDecl)
+		return e.FnGetMethodResult(r, m, astFunc)
 	}
-	if funcDecl.Type.Results == nil {
+	if astFunc.Type.Results == nil {
 		return nullContentDescriptor, nil
 	}
 
@@ -131,47 +154,46 @@ func (e *EthereumReflectorT) GetMethodResult(r reflect.Value, m reflect.Method, 
 	// Get the first non-error return type
 	var resultType reflect.Type
 	var resultField *ast.Field
-
-	// Find first non-error return type
 	for i := 0; i < m.Type.NumOut(); i++ {
 		if m.Type.Out(i) != errType {
 			resultType = m.Type.Out(i)
-			if i < len(funcDecl.Type.Results.List) {
-				resultField = funcDecl.Type.Results.List[i]
+			if i < len(astFunc.Type.Results.List) {
+				resultField = astFunc.Type.Results.List[i]
 			}
 			break
 		}
 	}
 
-	// If no non-error return type found, return null descriptor
 	if resultType == nil {
 		return nullContentDescriptor, nil
 	}
 
-	// Handle special case for nil field
-	if resultField == nil {
-		name := resultType.String()
-		description := name
-		summary := ""
-		required := true
-		deprecated := false
+	reflector := &jsonschema.Reflector{}
+	schema := reflector.Reflect(reflect.New(resultType).Interface())
 
-		schema, err := e.GetSchema(r, m, nil, resultType)
-		if err != nil {
-			return nullContentDescriptor, err
-		}
-
-		return meta_schema.ContentDescriptorObject{
-			Name:        (*meta_schema.ContentDescriptorObjectName)(&name),
-			Description: (*meta_schema.ContentDescriptorObjectDescription)(&description),
-			Summary:     (*meta_schema.ContentDescriptorObjectSummary)(&summary),
-			Schema:      &schema,
-			Required:    (*meta_schema.ContentDescriptorObjectRequired)(&required),
-			Deprecated:  (*meta_schema.ContentDescriptorObjectDeprecated)(&deprecated),
-		}, nil
+	name := resultType.String()
+	desc, err := e.GetContentDescriptorDescription(r, m, resultField)
+	if err != nil {
+		return nullContentDescriptor, err
 	}
+	marshalledJSON, err := schema.MarshalJSON()
+	if err != nil {
+		return nullContentDescriptor, err
+	}
+	parsed := &meta_schema.JSONSchema{}
+	err = parsed.UnmarshalJSON(marshalledJSON)
+	if err != nil {
+		return nullContentDescriptor, err
+	}
+	cd := meta_schema.ContentDescriptorObject{
+		Name:        (*meta_schema.ContentDescriptorObjectName)(&name),
+		Description: (*meta_schema.ContentDescriptorObjectDescription)(&desc),
+		Schema:      parsed,
+		Required:    (*meta_schema.ContentDescriptorObjectRequired)(new(bool)),
+	}
+	*cd.Required = true
 
-	return buildContentDescriptorObject(e, r, m, resultField, resultType)
+	return cd, nil
 }
 
 func (r *EthereumReflectorT) GetContentDescriptorDescription(rval reflect.Value, method reflect.Method, field *ast.Field) (string, error) {
