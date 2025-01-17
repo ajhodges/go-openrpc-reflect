@@ -88,7 +88,11 @@ func (e *EthereumReflectorT) GetMethodName(moduleName string, r reflect.Value, m
 }
 
 func generateJSONSchema(ty reflect.Type) (*meta_schema.JSONSchema, error) {
-	reflector := &jsonschema.Reflector{DoNotReference: true}
+	reflector := &jsonschema.Reflector{
+		Anonymous:      true,
+		DoNotReference: true,
+		AssignAnchor:   false,
+	}
 	schema := reflector.Reflect(reflect.New(ty).Interface())
 
 	marshalledJSON, err := schema.MarshalJSON()
