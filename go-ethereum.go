@@ -87,6 +87,24 @@ func (e *EthereumReflectorT) GetMethodName(moduleName string, r reflect.Value, m
 	return moduleName + "_" + firstToLower(m.Name), nil
 }
 
+func generateJSONSchema(ty reflect.Type) (*meta_schema.JSONSchema, error) {
+	reflector := &jsonschema.Reflector{DoNotReference: true}
+	schema := reflector.Reflect(reflect.New(ty).Interface())
+
+	marshalledJSON, err := schema.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+
+	parsed := &meta_schema.JSONSchema{}
+	err = parsed.UnmarshalJSON(marshalledJSON)
+	if err != nil {
+		return nil, err
+	}
+
+	return parsed, nil
+}
+
 func (e *EthereumReflectorT) GetMethodParams(r reflect.Value, m reflect.Method, astFunc *ast.FuncDecl) ([]meta_schema.ContentDescriptorObject, error) {
 	if e.FnGetMethodParams != nil {
 		return e.FnGetMethodParams(r, m, astFunc)
@@ -98,8 +116,6 @@ func (e *EthereumReflectorT) GetMethodParams(r reflect.Value, m reflect.Method, 
 	out := []meta_schema.ContentDescriptorObject{}
 	expanded := expandedFieldNamesFromList(astFunc.Type.Params.List)
 
-	reflector := &jsonschema.Reflector{DoNotReference: true}
-
 	for i, field := range expanded {
 		ty := m.Type.In(i + 1)
 
@@ -108,14 +124,7 @@ func (e *EthereumReflectorT) GetMethodParams(r reflect.Value, m reflect.Method, 
 			continue
 		}
 
-		// Generate JSON schema for the parameter type
-		schema := reflector.Reflect(reflect.New(ty).Interface())
-		marshalledJSON, err := schema.MarshalJSON()
-		if err != nil {
-			return nil, err
-		}
-		parsed := &meta_schema.JSONSchema{}
-		err = parsed.UnmarshalJSON(marshalledJSON)
+		schema, err := generateJSONSchema(ty)
 		if err != nil {
 			return nil, err
 		}
@@ -129,7 +138,7 @@ func (e *EthereumReflectorT) GetMethodParams(r reflect.Value, m reflect.Method, 
 		cd := meta_schema.ContentDescriptorObject{
 			Name:        (*meta_schema.ContentDescriptorObjectName)(&name),
 			Description: (*meta_schema.ContentDescriptorObjectDescription)(&desc),
-			Schema:      parsed,
+			Schema:      schema,
 			Required:    (*meta_schema.ContentDescriptorObjectRequired)(new(bool)),
 		}
 		*cd.Required = true
@@ -168,27 +177,21 @@ func (e *EthereumReflectorT) GetMethodResult(r reflect.Value, m reflect.Method, 
 		return nullContentDescriptor, nil
 	}
 
-	reflector := &jsonschema.Reflector{}
-	schema := reflector.Reflect(reflect.New(resultType).Interface())
+	schema, err := generateJSONSchema(resultType)
+	if err != nil {
+		return nullContentDescriptor, err
+	}
 
 	name := resultType.String()
 	desc, err := e.GetContentDescriptorDescription(r, m, resultField)
 	if err != nil {
 		return nullContentDescriptor, err
 	}
-	marshalledJSON, err := schema.MarshalJSON()
-	if err != nil {
-		return nullContentDescriptor, err
-	}
-	parsed := &meta_schema.JSONSchema{}
-	err = parsed.UnmarshalJSON(marshalledJSON)
-	if err != nil {
-		return nullContentDescriptor, err
-	}
+
 	cd := meta_schema.ContentDescriptorObject{
 		Name:        (*meta_schema.ContentDescriptorObjectName)(&name),
 		Description: (*meta_schema.ContentDescriptorObjectDescription)(&desc),
-		Schema:      parsed,
+		Schema:      schema,
 		Required:    (*meta_schema.ContentDescriptorObjectRequired)(new(bool)),
 	}
 	*cd.Required = true
