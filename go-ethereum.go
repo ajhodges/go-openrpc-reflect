@@ -2,8 +2,10 @@ package go_openrpc_reflect
 
 import (
 	"context"
+	"fmt"
 	"go/ast"
 	"reflect"
+	"strings"
 	"unicode"
 
 	meta_schema "github.com/open-rpc/meta-schema"
@@ -170,4 +172,119 @@ func (e *EthereumReflectorT) GetMethodResult(r reflect.Value, m reflect.Method, 
 	}
 
 	return buildContentDescriptorObject(e, r, m, resultField, resultType)
+}
+
+func (r *EthereumReflectorT) GetContentDescriptorDescription(rval reflect.Value, method reflect.Method, field *ast.Field) (string, error) {
+	// For parameters and results, use the type name
+	if field != nil {
+		// Get the type from the field
+		ty := field.Type
+		switch t := ty.(type) {
+		case *ast.Ident:
+			// Basic type (e.g., int, string)
+			return t.Name, nil
+		case *ast.StarExpr:
+			// Pointer type
+			switch x := t.X.(type) {
+			case *ast.Ident:
+				if x.Name == "Int" && x.Obj == nil {
+					// Special case for *big.Int
+					return "*big.Int", nil
+				}
+				return "*" + x.Name, nil
+			case *ast.SelectorExpr:
+				// Handle package qualified types (e.g., *big.Int)
+				if i, ok := x.X.(*ast.Ident); ok {
+					if i.Name == "big" {
+						return "*big.Int", nil
+					}
+					return "*" + x.Sel.Name, nil
+				}
+			}
+		case *ast.ArrayType:
+			// Array/slice type
+			switch elt := t.Elt.(type) {
+			case *ast.Ident:
+				return "[]" + elt.Name, nil
+			case *ast.SelectorExpr:
+				// Handle package qualified types (e.g., []pkg.Type)
+				return "[]" + elt.Sel.Name, nil
+			}
+		case *ast.SelectorExpr:
+			// Package qualified type (e.g., big.Int)
+			if i, ok := t.X.(*ast.Ident); ok && i.Name == "big" {
+				return "big." + t.Sel.Name, nil
+			}
+			return t.Sel.Name, nil
+		}
+		return "", fmt.Errorf("unsupported field type: %T", ty)
+	}
+
+	// For method descriptions, get from AST if available
+	if astFunc, err := getAstFuncDecl(rval, method); err == nil && astFunc != nil {
+		if desc := getMethodDescription(method, astFunc); desc != "" {
+			return desc, nil
+		}
+	}
+
+	// Fallback to the method name
+	return method.Name, nil
+}
+
+// getMethodDescription extracts the documentation comments from an AST function declaration
+func getMethodDescription(method reflect.Method, astFunc *ast.FuncDecl) string {
+	// If there's no AST function declaration, return empty description
+	if astFunc == nil {
+		return ""
+	}
+
+	// Get only the documentation comments, not the source code
+	if astFunc.Doc != nil {
+		var desc strings.Builder
+		for _, comment := range astFunc.Doc.List {
+			// Skip any comment that looks like source code
+			if strings.Contains(comment.Text, "func ") {
+				continue
+			}
+
+			// Remove comment markers and whitespace
+			text := strings.TrimSpace(strings.TrimPrefix(comment.Text, "//"))
+			text = strings.TrimSpace(strings.TrimPrefix(text, "/*"))
+			text = strings.TrimSpace(strings.TrimSuffix(text, "*/"))
+
+			if desc.Len() > 0 {
+				desc.WriteString("\n")
+			}
+			desc.WriteString(text)
+		}
+		return desc.String()
+	}
+
+	return ""
+}
+
+// getFieldType extracts the type from an AST field
+func getFieldType(field *ast.Field) reflect.Type {
+	if field == nil {
+		return nil
+	}
+
+	// Handle different types of AST expressions
+	switch t := field.Type.(type) {
+	case *ast.Ident:
+		// Basic type (e.g., int, string)
+		return reflect.TypeOf(t.Name)
+	case *ast.StarExpr:
+		// Pointer type
+		if i, ok := t.X.(*ast.Ident); ok {
+			return reflect.PtrTo(reflect.TypeOf(i.Name))
+		}
+	case *ast.ArrayType:
+		// Array/slice type
+		if i, ok := t.Elt.(*ast.Ident); ok {
+			return reflect.SliceOf(reflect.TypeOf(i.Name))
+		}
+	}
+
+	return nil
 }
